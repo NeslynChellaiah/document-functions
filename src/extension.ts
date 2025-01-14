@@ -1,10 +1,24 @@
 import * as acorn from "acorn";
 import * as walk from 'acorn-walk';
+import * as dotenv from 'dotenv';
+import * as path from 'path';
 import * as vscode from 'vscode';
 
+import { getDocs } from "./utils/apiService";
+
 const EDITOR: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
+let apiKey: string | undefined;
+let endpoint: string | undefined;
 
 export function activate(context: vscode.ExtensionContext) {
+
+	const envPath = path.join(context.extensionPath, '.env');
+	dotenv.config({ path: envPath });
+
+
+	apiKey = process.env.API_KEY;
+	endpoint = process.env.ENDPOINT;
+
 	const listenSelection: vscode.Disposable = vscode.window
 		.onDidChangeTextEditorSelection((event: vscode.TextEditorSelectionChangeEvent) => {
 			let timeout: NodeJS.Timeout | undefined;
@@ -51,7 +65,7 @@ function AddDocsToFnDeclaration(node: acorn.FunctionDeclaration | acorn.Anonymou
 	if (!startPos || !endPos || startPos.isEqual(endPos)) {
 		return;
 	}
-	
+
 	const currentSelection: vscode.Selection = currentEditor.selection;
 	if (cannotAddDocs(startPos, endPos, currentSelection)) {
 		return;
@@ -63,21 +77,25 @@ function AddDocsToFnDeclaration(node: acorn.FunctionDeclaration | acorn.Anonymou
 function cannotAddDocs(startPos: vscode.Position, endPos: vscode.Position, currentSelection: vscode.Selection) {
 	const range: vscode.Range = new vscode.Range(startPos, endPos);
 
-	return (!startPos.isEqual(currentSelection.start) || !endPos.isEqual(currentSelection.end) 
+	return (!startPos.isEqual(currentSelection.start) || !endPos.isEqual(currentSelection.end)
 		|| !startPos.isEqual(range.start) || !endPos.isEqual(range.end));
 }
 
-function insertDocs(startPos: vscode.Position) {
+async function insertDocs(startPos: vscode.Position) {
 	const insertPosition = new vscode.Position(startPos.line, 0);
+	if (!apiKey || !endpoint) {
+		return;
+	}
+	const docs: string = await getDocs(apiKey, endpoint);
 	EDITOR?.edit(editBuilder => {
-		editBuilder.insert(insertPosition, "/**Static Docs\n**/\n");
-		}).then(success => {
-			if (!success || !EDITOR) {
-				return;
-			}
-			const newSelection = new vscode.Selection( EDITOR?.selection.end,  EDITOR?.selection.end);
-			EDITOR.selection = newSelection;
-		});
+		editBuilder.insert(insertPosition, docs);
+	}).then(success => {
+		if (!success || !EDITOR) {
+			return;
+		}
+		const newSelection = new vscode.Selection(EDITOR?.selection.end, EDITOR?.selection.end);
+		EDITOR.selection = newSelection;
+	});
 }
 
 export function deactivate() { }			
