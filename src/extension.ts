@@ -70,8 +70,8 @@ function AddDocsToFnDeclaration(node: acorn.FunctionDeclaration | acorn.Anonymou
 	if (cannotAddDocs(startPos, endPos, currentSelection)) {
 		return;
 	}
-
-	insertDocs(startPos);
+	const fnScope: string = currentEditor.document.getText().slice(node.start, node.end);
+	insertDocs(startPos, fnScope);
 }
 
 function cannotAddDocs(startPos: vscode.Position, endPos: vscode.Position, currentSelection: vscode.Selection) {
@@ -81,12 +81,12 @@ function cannotAddDocs(startPos: vscode.Position, endPos: vscode.Position, curre
 		|| !startPos.isEqual(range.start) || !endPos.isEqual(range.end));
 }
 
-async function insertDocs(startPos: vscode.Position) {
+async function insertDocs(startPos: vscode.Position, fnScope: string) {
 	const insertPosition = new vscode.Position(startPos.line, 0);
 	if (!apiKey || !endpoint) {
 		return;
 	}
-	const docs: string = await getDocs(apiKey, endpoint);
+	const docs: string = await getDocs(apiKey, endpoint, fnScope);
 	EDITOR?.edit(editBuilder => {
 		editBuilder.insert(insertPosition, docs);
 	}).then(success => {

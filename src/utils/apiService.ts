@@ -2,9 +2,9 @@ import axios from "axios";
 import * as vscode from 'vscode';
 
 let isLoading: boolean = false;
-const prompt: string = "For the given JS function give me a document. The response should only be the docs and nothing else do not add the function in the docs. Start with /** and end with */. dont send it in ``` and ``` send it directly as free text and with new line where necessarey";
+const prompt: string = "For the given JS function give me a document. The response should only be the docs and nothing else do not add the function in the docs. Start with /** and end with */. dont send it in ``` and ``` send it directly as free text and with new line where necessarey. The function is given below \n\n";
 
-export async function getDocs(apiKey: string, endpoint: string): Promise<string> {
+export async function getDocs(apiKey: string, endpoint: string, fnScope: string): Promise<string> {
 
     if (isLoading) {
         return '';
@@ -14,7 +14,7 @@ export async function getDocs(apiKey: string, endpoint: string): Promise<string>
     const response = await axios.post(
         endpoint,
         { 
-            "contents": [{ "parts": [{ "text": prompt }] }] 
+            "contents": [{ "parts": [{ "text": prompt + fnScope }] }] 
         },
         {
             params: {
@@ -24,7 +24,7 @@ export async function getDocs(apiKey: string, endpoint: string): Promise<string>
                 'Content-Type': 'application/json',
             },
         }
-    )
+    );
 
     isLoading = false;
     const suggestions = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
