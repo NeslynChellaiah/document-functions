@@ -9,8 +9,20 @@ import { getDocs } from "./utils/apiService";
 const EDITOR: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
 let apiKey: string | undefined;
 let endpoint: string | undefined;
+let fnScope: string = "";
+let fnStart: vscode.Position;
+let selectionRange: vscode.Range;
 
 export function activate(context: vscode.ExtensionContext) {
+	context.subscriptions.push(
+		vscode.languages.registerCodeActionsProvider(
+			{ language: "javascript", scheme: "file" },
+			new QuickFixProvider(),
+			{
+				providedCodeActionKinds: [vscode.CodeActionKind.QuickFix]
+			}
+		)
+	);
 
 	const envPath = path.join(context.extensionPath, '.env');
 	dotenv.config({ path: envPath });
@@ -32,6 +44,9 @@ export function activate(context: vscode.ExtensionContext) {
 		});
 
 	context.subscriptions.push(listenSelection);
+	context.subscriptions.push(
+		vscode.commands.registerCommand("extension.docFn", insertDocs)
+	);
 }
 
 function addDocument(event: vscode.TextEditorSelectionChangeEvent) {
@@ -70,19 +85,20 @@ function AddDocsToFnDeclaration(node: acorn.FunctionDeclaration | acorn.Anonymou
 	if (cannotAddDocs(startPos, endPos, currentSelection)) {
 		return;
 	}
-	const fnScope: string = currentEditor.document.getText().slice(node.start, node.end);
-	insertDocs(startPos, fnScope);
+	fnScope = currentEditor.document.getText().slice(node.start, node.end);
+	fnStart = startPos;
+	return;
 }
 
 function cannotAddDocs(startPos: vscode.Position, endPos: vscode.Position, currentSelection: vscode.Selection) {
-	const range: vscode.Range = new vscode.Range(startPos, endPos);
+	selectionRange = new vscode.Range(startPos, endPos);
 
 	return (!startPos.isEqual(currentSelection.start) || !endPos.isEqual(currentSelection.end)
-		|| !startPos.isEqual(range.start) || !endPos.isEqual(range.end));
+		|| !startPos.isEqual(selectionRange.start) || !endPos.isEqual(selectionRange.end));
 }
 
-async function insertDocs(startPos: vscode.Position, fnScope: string) {
-	const insertPosition = new vscode.Position(startPos.line, 0);
+async function insertDocs() {
+	const insertPosition = new vscode.Position(fnStart.line, 0);
 	if (!apiKey || !endpoint) {
 		return;
 	}
@@ -96,6 +112,28 @@ async function insertDocs(startPos: vscode.Position, fnScope: string) {
 		const newSelection = new vscode.Selection(EDITOR?.selection.end, EDITOR?.selection.end);
 		EDITOR.selection = newSelection;
 	});
+}
+
+class QuickFixProvider implements vscode.CodeActionProvider {
+	provideCodeActions(
+		document: vscode.TextDocument,
+		range: vscode.Range
+	): vscode.CodeAction[] {
+		const quickFixes: vscode.CodeAction[] = [];
+		if (!range.start.isEqual(selectionRange.start) || !range.end.isEqual(selectionRange.end)) {
+			return quickFixes;
+		}
+
+
+		const docFn = new vscode.CodeAction(
+			"Add function docs",
+			vscode.CodeActionKind.QuickFix
+		);
+		docFn.command = { command: "extension.docFn", title: "Add function docs", arguments: [document, range] };
+		quickFixes.push(docFn);
+
+		return quickFixes;
+	}
 }
 
 export function deactivate() { }			
