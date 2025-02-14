@@ -11,8 +11,6 @@ let fnStart: vscode.Position;
 var selectionRange: vscode.Range;
 
 export async function activate(context: vscode.ExtensionContext) {
-	await context.secrets.delete("API_KEY");
-
 	context.subscriptions.push(
 		vscode.languages.registerCodeActionsProvider(
 			{ language: "javascript", scheme: "file" },
@@ -69,15 +67,22 @@ function addDocument(event: vscode.TextEditorSelectionChangeEvent) {
 		const ast: acorn.Program = acorn.parse(code, { ecmaVersion: 2020 });
 		walk.simple(ast, {
 			FunctionDeclaration(node: acorn.FunctionDeclaration | acorn.AnonymousFunctionDeclaration) {
-				AddDocsToFnDeclaration(node, currentEditor);
+				if (node?.type == "FunctionDeclaration") {
+					AddDocsToFnDeclaration(node, currentEditor);
+				}
 			},
+			VariableDeclarator(node: acorn.VariableDeclarator) {
+				if (node?.init?.type === "ArrowFunctionExpression") {
+					AddDocsToFnDeclaration(node, currentEditor);
+				}
+			}
 		});
 	} catch (error: any) {
 		vscode.window.showErrorMessage(error.message);
 	}
 }
 
-function AddDocsToFnDeclaration(node: acorn.FunctionDeclaration | acorn.AnonymousFunctionDeclaration, currentEditor: vscode.TextEditor) {
+function AddDocsToFnDeclaration(node: acorn.FunctionDeclaration | acorn.AnonymousFunctionDeclaration | acorn.ArrowFunctionExpression | acorn.VariableDeclarator, currentEditor: vscode.TextEditor) {
 	if (!node?.id?.start && !node?.id?.end) {
 		return;
 	}
