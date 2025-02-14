@@ -16,8 +16,8 @@
   "contributes": {
     "commands": [
       {
-        "command": "document-functions.helloWorld",
-        "title": "Hello World"
+        "command": "document-functions.docFn",
+        "title": "Add function docs"
       }
     ]
   },
