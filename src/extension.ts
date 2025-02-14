@@ -1,19 +1,18 @@
 import * as acorn from "acorn";
 import * as walk from 'acorn-walk';
-import * as dotenv from 'dotenv';
-import * as path from 'path';
 import * as vscode from 'vscode';
 
 import { getDocs } from "./utils/apiService";
 
 const EDITOR: vscode.TextEditor | undefined = vscode.window.activeTextEditor;
 let apiKey: string | undefined;
-let endpoint: string | undefined;
 let fnScope: string = "";
 let fnStart: vscode.Position;
-let selectionRange: vscode.Range;
+var selectionRange: vscode.Range;
 
-export function activate(context: vscode.ExtensionContext) {
+export async function activate(context: vscode.ExtensionContext) {
+	await context.secrets.delete("API_KEY");
+
 	context.subscriptions.push(
 		vscode.languages.registerCodeActionsProvider(
 			{ language: "javascript", scheme: "file" },
@@ -24,12 +23,19 @@ export function activate(context: vscode.ExtensionContext) {
 		)
 	);
 
-	const envPath = path.join(context.extensionPath, '.env');
-	dotenv.config({ path: envPath });
-
-
-	apiKey = process.env.API_KEY;
-	endpoint = process.env.ENDPOINT;
+	apiKey = await context.secrets.get("API_KEY");
+	if (!apiKey) {
+		const key: string | undefined = await vscode.window.showInputBox({
+			prompt: "Enter gemini api key",
+			placeHolder: "dvygmjfcecvyf...",
+			ignoreFocusOut: true
+		});
+		await context.secrets.store("API_KEY", key || '');
+		apiKey = key;
+	}
+	if (!apiKey) {
+		vscode.window.showErrorMessage("No API credentials provided.");
+	}
 
 	const listenSelection: vscode.Disposable = vscode.window
 		.onDidChangeTextEditorSelection((event: vscode.TextEditorSelectionChangeEvent) => {
@@ -45,7 +51,7 @@ export function activate(context: vscode.ExtensionContext) {
 
 	context.subscriptions.push(listenSelection);
 	context.subscriptions.push(
-		vscode.commands.registerCommand("extension.docFn", insertDocs)
+		vscode.commands.registerCommand("document-functions.docFn", () => { insertDocs(context) })
 	);
 }
 
@@ -85,26 +91,41 @@ function AddDocsToFnDeclaration(node: acorn.FunctionDeclaration | acorn.Anonymou
 	if (cannotAddDocs(startPos, endPos, currentSelection)) {
 		return;
 	}
+	selectionRange = new vscode.Range(startPos, endPos);
 	fnScope = currentEditor.document.getText().slice(node.start, node.end);
 	fnStart = startPos;
 	return;
 }
 
 function cannotAddDocs(startPos: vscode.Position, endPos: vscode.Position, currentSelection: vscode.Selection) {
-	selectionRange = new vscode.Range(startPos, endPos);
+	const range: vscode.Range = new vscode.Range(startPos, endPos);
 
 	return (!startPos.isEqual(currentSelection.start) || !endPos.isEqual(currentSelection.end)
-		|| !startPos.isEqual(selectionRange.start) || !endPos.isEqual(selectionRange.end));
+		|| !startPos.isEqual(range.start) || !endPos.isEqual(range.end));
 }
 
-async function insertDocs() {
+async function insertDocs(context: vscode.ExtensionContext) {
 	const insertPosition = new vscode.Position(fnStart.line, 0);
-	if (!apiKey || !endpoint) {
+	apiKey = await context.secrets.get("API_KEY") || '';
+	if (!apiKey) {
+		const key = await vscode.window.showInputBox({
+			prompt: "Enter gemini api key",
+			placeHolder: "dvygmjfcecvyf...",
+			ignoreFocusOut: true
+		});
+		await context.secrets.store("API_KEY", key || '');
+		apiKey = key;
+	}
+
+	if (!apiKey) {
+		vscode.window.showErrorMessage("No API credentials provided.");
 		return;
 	}
-	const docs: string = await getDocs(apiKey, endpoint, fnScope);
+	
+	const docs: string = await getDocs(apiKey, fnScope);
 	EDITOR?.edit(editBuilder => {
 		editBuilder.insert(insertPosition, docs);
+		vscode.window.showInformationMessage("Function docs updated");
 	}).then(success => {
 		if (!success || !EDITOR) {
 			return;
@@ -129,7 +150,7 @@ class QuickFixProvider implements vscode.CodeActionProvider {
 			"Add function docs",
 			vscode.CodeActionKind.QuickFix
 		);
-		docFn.command = { command: "extension.docFn", title: "Add function docs", arguments: [document, range] };
+		docFn.command = { command: "document-functions.docFn", title: "Add function docs", arguments: [document, range] };
 		quickFixes.push(docFn);
 
 		return quickFixes;
