@@ -1,7 +1,8 @@
 {
   "name": "document-functions",
-  "displayName": "Document Functions",
-  "description": "",
+  "displayName": "JavaScript Fn Docs",
+  "description": "A plugin to add AI generated function docs.",
+  "icon": "assets/logo.png",
   "version": "0.0.1",
   "engines": {
     "vscode": "^1.96.0"
