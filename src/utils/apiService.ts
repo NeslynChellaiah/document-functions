@@ -12,28 +12,28 @@ export async function getDocs(apiKey: string, fnScope: string): Promise<string> 
     }
     isLoading = true;
     vscode.window.showInformationMessage("Fetching function docs.");
-    const response = await axios.post(
-        endpoint,
-        { 
-            "contents": [{ "parts": [{ "text": prompt + fnScope }] }] 
-        },
-        {
-            params: {
-                key: apiKey
+    try {
+        const response = await axios.post(
+            endpoint,
+            {
+                "contents": [{ "parts": [{ "text": prompt + fnScope }] }]
             },
-            headers: {
-                'Content-Type': 'application/json',
-            },
-        }
-    );
+            {
+                params: {
+                    key: apiKey
+                },
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+            }
+        );
 
-    isLoading = false;
-    const suggestions = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
+        isLoading = false;
+        const suggestions = response.data?.candidates?.[0]?.content?.parts?.[0]?.text;
 
-    if (response?.status !== 200 || !suggestions) {
+        return suggestions;
+    } catch (e: any) {
         vscode.window.showErrorMessage("Something went wrong.");
-        throw response;
+        throw (e?.message);
     }
-
-    return suggestions;
 }
