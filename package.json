@@ -4,7 +4,7 @@
   "description": "A plugin to add AI generated function docs.",
   "icon": "assets/logo.png",
   "publisher": "NeslynChellaiahPiousMariaJose",
-  "version": "0.0.8",
+  "version": "0.1.6",
   "repository": {
     "type": "git",
     "url": "https://github.com/NeslynChellaiah/document-functions"
